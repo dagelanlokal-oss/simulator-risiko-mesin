@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # ==========================================
-# LOAD MODEL & SCALER (Cached agar tidak reload setiap interaksi)
+# LOAD MODEL & SCALER
 # ==========================================
 @st.cache_resource
 def load_model():
@@ -30,91 +30,54 @@ except FileNotFoundError:
     model_loaded = False
 
 # ==========================================
-# HEADER APLIKASI
+# HEADER
 # ==========================================
 st.title("📊 Simulator Prediksi Risiko")
-st.markdown("""
-Aplikasi ini merupakan hasil operasionalisasi (deployment) model Machine Learning
-yang telah dilatih pada tahap sebelumnya. Masukkan nilai fitur di bawah ini untuk
-melihat hasil prediksi risiko secara real-time.
-""")
+st.markdown("Aplikasi simulasi prediksi risiko mesin menggunakan Machine Learning.")
 st.divider()
 
 if not model_loaded:
-    st.error(
-        "⚠️ File model_risiko_v1.joblib atau scaler_risiko_v1.joblib tidak ditemukan. "
-        "Pastikan kedua file tersebut berada dalam satu folder dengan app.py."
-    )
+    st.error("⚠️ File model atau scaler tidak ditemukan.")
     st.stop()
 
 # ==========================================
-# INPUT PENGGUNA
+# INPUT PENGGUNA (Hanya 2 fitur sesuai scaler)
 # ==========================================
-# CATATAN PENTING:
-# Sesuaikan nama, jumlah, dan URUTAN input di bawah ini
-# agar PERSIS SAMA dengan urutan kolom X saat model dilatih (fit).
-# Jika urutan/kolom berbeda, hasil prediksi bisa salah tanpa error sama sekali.
-
 st.subheader("Input Data Simulasi")
 
 col1, col2 = st.columns(2)
 
 with col1:
     usia = st.number_input("Usia (tahun)", min_value=17, max_value=100, value=30, step=1)
-    pendapatan = st.number_input("Pendapatan Bulanan (Rp)", min_value=0, value=5000000, step=100000)
-    lama_bekerja = st.number_input("Lama Bekerja (tahun)", min_value=0, max_value=50, value=3, step=1)
 
 with col2:
-    jumlah_pinjaman = st.number_input("Jumlah Pinjaman (Rp)", min_value=0, value=10000000, step=500000)
-    tenor = st.slider("Tenor Cicilan (bulan)", min_value=1, max_value=60, value=12)
-    riwayat_kredit = st.selectbox("Riwayat Kredit", ["Baik", "Cukup", "Buruk"])
-
-# Encoding sederhana untuk fitur kategorikal
-riwayat_map = {"Baik": 0, "Cukup": 1, "Buruk": 2}
-riwayat_encoded = riwayat_map[riwayat_kredit]
+    pendapatan = st.number_input("Pendapatan Bulanan (Rp)", min_value=0, value=5000000, step=100000)
 
 st.divider()
 
 # ==========================================
-# TOMBOL PREDIKSI
+# PREDIKSI
 # ==========================================
 if st.button("🔍 Jalankan Prediksi", type="primary", use_container_width=True):
 
-    # Buat input sebagai DataFrame
-    input_dict = {
+    # Input sesuai dengan 2 fitur yang diharapkan scaler
+    input_data = pd.DataFrame({
         "Usia": [usia],
-        "Pendapatan": [pendapatan],
-        "Lama Bekerja": [lama_bekerja],
-        "Jumlah Pinjaman": [jumlah_pinjaman],
-        "Tenor": [tenor],
-        "Riwayat Kredit": [riwayat_encoded]
-    }
-    
-    input_data = pd.DataFrame(input_dict)
+        "Pendapatan": [pendapatan]
+    })
 
-    # ==================== DEBUG INFO ====================
-    st.write("**Debug Information:**")
-    st.write(f"Jumlah fitur input : {input_data.shape[1]}")
-    st.write(f"Nama kolom input   : {list(input_data.columns)}")
-    
-    try:
-        st.write(f"Jumlah fitur yang diharapkan scaler: {scaler.n_features_in_}")
-    except:
-        st.write("Tidak bisa membaca scaler.n_features_in_")
+    st.write(f"Jumlah fitur input: {input_data.shape[1]}")
 
     # Scaling
     input_scaled = scaler.transform(input_data)
-    # ===================================================
 
-    # Lanjutkan prediksi...
+    # Prediksi
     prediksi = model.predict(input_scaled)[0]
 
-    # Jika model mendukung predict_proba (klasifikasi probabilistik)
     try:
         proba = model.predict_proba(input_scaled)[0]
         confidence = np.max(proba) * 100
-    except AttributeError:
-        proba = None
+    except:
         confidence = None
 
     st.subheader("Hasil Simulasi")
@@ -125,29 +88,13 @@ if st.button("🔍 Jalankan Prediksi", type="primary", use_container_width=True)
         st.success("✅ Status: **RISIKO RENDAH**")
 
     if confidence is not None:
-        st.metric(label="Tingkat Keyakinan Model", value=f"{confidence:.2f}%")
+        st.metric("Tingkat Keyakinan", f"{confidence:.2f}%")
 
-        # Visualisasi probabilitas dengan seaborn/matplotlib
-        fig, ax = plt.subplots(figsize=(5, 3))
-        kelas = ["Risiko Rendah", "Risiko Tinggi"]
-        sns.barplot(x=kelas, y=proba, palette=["#2ecc71", "#e74c3c"], ax=ax)
-        ax.set_ylabel("Probabilitas")
-        ax.set_ylim(0, 1)
-        for i, v in enumerate(proba):
-            ax.text(i, v + 0.02, f"{v*100:.1f}%", ha="center", fontweight="bold")
-        st.pyplot(fig)
-
-    with st.expander("Lihat detail data input"):
-        st.dataframe(
-            pd.DataFrame(input_data, columns=[
-                "Usia", "Pendapatan", "Lama Bekerja",
-                "Jumlah Pinjaman", "Tenor", "Riwayat Kredit (encoded)"
-            ]),
-            use_container_width=True
-        )
+    with st.expander("Detail Input"):
+        st.dataframe(input_data, use_container_width=True)
 
 # ==========================================
 # FOOTER
 # ==========================================
 st.divider()
-st.caption("Model Simulasi Risiko v1 · Dibangun dengan Streamlit · Tugas Pemodelan & Simulasi (MLOps)")
+st.caption("Simulator Risiko Mesin v1 · Streamlit + Scikit-learn")
