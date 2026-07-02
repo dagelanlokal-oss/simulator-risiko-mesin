@@ -1,95 +1,140 @@
-## Langkah 3: Implementasi UI Interaktif (Konsep Streamlit)
+import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
+import joblib
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# ==========================
-# DATA CONTOH
-# ==========================
+# ==========================================
+# KONFIGURASI HALAMAN
+# ==========================================
+st.set_page_config(
+    page_title="Simulator Prediksi Risiko",
+    page_icon="📊",
+    layout="centered"
+)
 
-X = np.array([
-    [10,10],
-    [20,10],
-    [30,20],
-    [40,30],
-    [50,40]
-])
+# ==========================================
+# LOAD MODEL & SCALER (Cached agar tidak reload setiap interaksi)
+# ==========================================
+@st.cache_resource
+def load_model():
+    model = joblib.load("model.risiko_v1.joblib")
+    scaler = joblib.load("scaler.risiko_v1.joblib")
+    return model, scaler
 
-y = np.array([100,130,170,220,280])
+try:
+    model, scaler = load_model()
+    model_loaded = True
+except FileNotFoundError:
+    model_loaded = False
 
-# ==========================
-# LATIH MODEL
-# ==========================
+# ==========================================
+# HEADER APLIKASI
+# ==========================================
+st.title("📊 Simulator Prediksi Risiko")
+st.markdown("""
+Aplikasi ini merupakan hasil operasionalisasi (deployment) model Machine Learning
+yang telah dilatih pada tahap sebelumnya. Masukkan nilai fitur di bawah ini untuk
+melihat hasil prediksi risiko secara real-time.
+""")
+st.divider()
 
-model = LinearRegression()
-model.fit(X, y)
+if not model_loaded:
+    st.error(
+        "⚠️ File model.risiko_v1.joblib atau scaler.risiko_v1.joblib tidak ditemukan. "
+        "Pastikan kedua file tersebut berada dalam satu folder dengan app.py."
+    )
+    st.stop()
 
-# ==========================
-# BASELINE
-# ==========================
+# ==========================================
+# INPUT PENGGUNA
+# ==========================================
+# CATATAN PENTING:
+# Sesuaikan nama, jumlah, dan URUTAN input di bawah ini
+# agar PERSIS SAMA dengan urutan kolom X saat model dilatih (fit).
+# Jika urutan/kolom berbeda, hasil prediksi bisa salah tanpa error sama sekali.
 
-baseline_input = pd.DataFrame([[10,10]], columns=[
-    "Iklan",
-    "Diskon"
-])
-
-baseline_pred = model.predict(baseline_input)[0]
-
-# ==========================
-# FUNGSI SIMULASI
-# ==========================
-
-def run_simulation(iklan, diskon):
-
-    input_data = pd.DataFrame([[iklan,diskon]], columns=[
-        "Iklan",
-        "Diskon"
-    ])
-
-    hasil_pred = model.predict(input_data)[0]
-
-    delta = hasil_pred - baseline_pred
-
-    return hasil_pred, delta
-
-import streamlit as st
-
-st.title("🚀🚀 Simulator Kebijakan Ekonomi")
-st.header("Analisis Skenario What-If")
-st.write("Aplikasi ini mensimulasikan dampak perubahan variabel terhadap keuntungan.")
-
-# Membuat bilah samping
-st.sidebar.header("Variabel Kontrol (Intervensi)")
-# Widget Slider: (Label, Nilai Min, Nilai Max, Nilai Default)
-anggaran_iklan = st.sidebar.slider("Anggaran Iklan (Juta)", 0, 100, 10)
-persen_diskon = st.sidebar.slider("Besaran Diskon (%)", 0, 50, 5)
+st.subheader("Input Data Simulasi")
 
 col1, col2 = st.columns(2)
-# Menampilkan angka besar dengan indikator kenaikan (Delta)
-col1.metric(label="Prediksi Keuntungan", value="Rp 150 Juta", delta="12 Juta")
-col2.metric(label="Risiko Stok", value="5%", delta="-2%", delta_color="inverse")
 
-import joblib # Jika model disimpan sebagai file .pkl
+with col1:
+    usia = st.number_input("Usia (tahun)", min_value=17, max_value=100, value=30, step=1)
+    pendapatan = st.number_input("Pendapatan Bulanan (Rp)", min_value=0, value=5000000, step=100000)
+    lama_bekerja = st.number_input("Lama Bekerja (tahun)", min_value=0, max_value=50, value=3, step=1)
 
-# 1. Load Model (Contoh model regresi minggu ke-4)
-model = joblib.load('model_risiko_v1.joblib')
+with col2:
+    jumlah_pinjaman = st.number_input("Jumlah Pinjaman (Rp)", min_value=0, value=10000000, step=500000)
+    tenor = st.slider("Tenor Cicilan (bulan)", min_value=1, max_value=60, value=12)
+    riwayat_kredit = st.selectbox("Riwayat Kredit", ["Baik", "Cukup", "Buruk"])
 
-# 2. UI Interaksi
-st.sidebar.title("Input Kebijakan")
-iklan = st.sidebar.slider("Iklan", 0, 50, 10)
-diskon = st.sidebar.slider("Diskon", 0, 20, 5)
+# Encoding sederhana untuk fitur kategorikal
+riwayat_map = {"Baik": 0, "Cukup": 1, "Buruk": 2}
+riwayat_encoded = riwayat_map[riwayat_kredit]
 
-# 3. Prediksi (Logika What-If)
-# Mengubah input slider menjadi format matriks X [Samples, Features]
-input_data = np.array([[iklan, diskon]])
-prediksi = model.predict(input_data)[0]
+st.divider()
 
-# 4. Tampilkan
-st.subheader("Hasil Simulasi")
-st.success(f"Keuntungan yang diprediksi: Rp {prediksi:.2f} Juta")
+# ==========================================
+# TOMBOL PREDIKSI
+# ==========================================
+if st.button("🔍 Jalankan Prediksi", type="primary", use_container_width=True):
 
-import matplotlib.pyplot as plt
-fig, ax = plt.subplots()
-# Logika grafik perbandingan baseline vs intervensi
-ax.bar(['Baseline', 'Skenario Baru'], [100, prediksi])
-st.pyplot(fig)
+    # Susun input sesuai urutan fitur saat training
+    input_data = np.array([[
+        usia,
+        pendapatan,
+        lama_bekerja,
+        jumlah_pinjaman,
+        tenor,
+        riwayat_encoded
+    ]])
+
+    # Standarisasi input menggunakan scaler yang sama dengan saat training
+    input_scaled = scaler.transform(input_data)
+
+    # Prediksi
+    prediksi = model.predict(input_scaled)[0]
+
+    # Jika model mendukung predict_proba (klasifikasi probabilistik)
+    try:
+        proba = model.predict_proba(input_scaled)[0]
+        confidence = np.max(proba) * 100
+    except AttributeError:
+        proba = None
+        confidence = None
+
+    st.subheader("Hasil Simulasi")
+
+    if prediksi == 1:
+        st.error("⚠️ Status: **BERISIKO TINGGI**")
+    else:
+        st.success("✅ Status: **RISIKO RENDAH**")
+
+    if confidence is not None:
+        st.metric(label="Tingkat Keyakinan Model", value=f"{confidence:.2f}%")
+
+        # Visualisasi probabilitas dengan seaborn/matplotlib
+        fig, ax = plt.subplots(figsize=(5, 3))
+        kelas = ["Risiko Rendah", "Risiko Tinggi"]
+        sns.barplot(x=kelas, y=proba, palette=["#2ecc71", "#e74c3c"], ax=ax)
+        ax.set_ylabel("Probabilitas")
+        ax.set_ylim(0, 1)
+        for i, v in enumerate(proba):
+            ax.text(i, v + 0.02, f"{v*100:.1f}%", ha="center", fontweight="bold")
+        st.pyplot(fig)
+
+    with st.expander("Lihat detail data input"):
+        st.dataframe(
+            pd.DataFrame(input_data, columns=[
+                "Usia", "Pendapatan", "Lama Bekerja",
+                "Jumlah Pinjaman", "Tenor", "Riwayat Kredit (encoded)"
+            ]),
+            use_container_width=True
+        )
+
+# ==========================================
+# FOOTER
+# ==========================================
+st.divider()
+st.caption("Model Simulasi Risiko v1 · Dibangun dengan Streamlit · Tugas Pemodelan & Simulasi (MLOps)")
