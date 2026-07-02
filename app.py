@@ -80,20 +80,25 @@ st.divider()
 # ==========================================
 if st.button("🔍 Jalankan Prediksi", type="primary", use_container_width=True):
 
-    # Susun input sesuai urutan fitur saat training
-    input_data = np.array([[
-        usia,
-        pendapatan,
-        lama_bekerja,
-        jumlah_pinjaman,
-        tenor,
-        riwayat_encoded
-    ]])
+    # Buat DataFrame dengan nama kolom yang PERSIS sama saat training
+    input_dict = {
+        "Usia": [usia],
+        "Pendapatan": [pendapatan],
+        "Lama Bekerja": [lama_bekerja],
+        "Jumlah Pinjaman": [jumlah_pinjaman],
+        "Tenor": [tenor],
+        "Riwayat Kredit": [riwayat_encoded]
+    }
+    
+    input_data = pd.DataFrame(input_dict)
 
-    # Standarisasi input menggunakan scaler yang sama dengan saat training
+    # Debug: tampilkan jumlah fitur
+    st.write(f"Jumlah fitur input: {input_data.shape[1]}")
+
+    # Scaling
     input_scaled = scaler.transform(input_data)
 
-    # Prediksi
+    # Lanjutkan prediksi...
     prediksi = model.predict(input_scaled)[0]
 
     # Jika model mendukung predict_proba (klasifikasi probabilistik)
