@@ -80,7 +80,7 @@ st.divider()
 # ==========================================
 if st.button("🔍 Jalankan Prediksi", type="primary", use_container_width=True):
 
-    # Buat DataFrame dengan nama kolom yang PERSIS sama saat training
+    # Buat input sebagai DataFrame
     input_dict = {
         "Usia": [usia],
         "Pendapatan": [pendapatan],
@@ -92,11 +92,19 @@ if st.button("🔍 Jalankan Prediksi", type="primary", use_container_width=True)
     
     input_data = pd.DataFrame(input_dict)
 
-    # Debug: tampilkan jumlah fitur
-    st.write(f"Jumlah fitur input: {input_data.shape[1]}")
+    # ==================== DEBUG INFO ====================
+    st.write("**Debug Information:**")
+    st.write(f"Jumlah fitur input : {input_data.shape[1]}")
+    st.write(f"Nama kolom input   : {list(input_data.columns)}")
+    
+    try:
+        st.write(f"Jumlah fitur yang diharapkan scaler: {scaler.n_features_in_}")
+    except:
+        st.write("Tidak bisa membaca scaler.n_features_in_")
 
     # Scaling
     input_scaled = scaler.transform(input_data)
+    # ===================================================
 
     # Lanjutkan prediksi...
     prediksi = model.predict(input_scaled)[0]
