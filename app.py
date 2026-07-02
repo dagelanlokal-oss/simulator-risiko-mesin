@@ -19,8 +19,8 @@ st.set_page_config(
 # ==========================================
 @st.cache_resource
 def load_model():
-    model = joblib.load("model.risiko_v1.joblib")
-    scaler = joblib.load("scaler.risiko_v1.joblib")
+    model = joblib.load("model_risiko_v1.joblib")
+    scaler = joblib.load("scaler_risiko_v1.joblib")
     return model, scaler
 
 try:
@@ -42,7 +42,7 @@ st.divider()
 
 if not model_loaded:
     st.error(
-        "⚠️ File model.risiko_v1.joblib atau scaler.risiko_v1.joblib tidak ditemukan. "
+        "⚠️ File model_risiko_v1.joblib atau scaler_risiko_v1.joblib tidak ditemukan. "
         "Pastikan kedua file tersebut berada dalam satu folder dengan app.py."
     )
     st.stop()
